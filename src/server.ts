@@ -40,103 +40,103 @@ function createMcpServer(): McpServer {
     }
   );
 
-  // Add production-ready API tool
-  server.registerTool(
-    "fetch-data",
-    {
-      title: "External API Fetcher",
-      description: "Fetch data from external APIs with error handling",
-      inputSchema: {
-        url: z.string().url().describe("API endpoint URL"),
-        method: z.enum(["GET", "POST", "PUT", "DELETE"]).default("GET"),
-        headers: z.record(z.string()).optional().describe("HTTP headers"),
-        body: z.string().optional().describe("Request body (JSON string)")
-      }
-    },
-    async ({ url, method, headers = {}, body }) => {
-      try {
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            ...headers
-          },
-          body: body ? body : undefined
-        });
+  // // Add production-ready API tool
+  // server.registerTool(
+  //   "fetch-data",
+  //   {
+  //     title: "External API Fetcher",
+  //     description: "Fetch data from external APIs with error handling",
+  //     inputSchema: {
+  //       url: z.string().url().describe("API endpoint URL"),
+  //       method: z.enum(["GET", "POST", "PUT", "DELETE"]).default("GET"),
+  //       headers: z.record(z.string()).optional().describe("HTTP headers"),
+  //       body: z.string().optional().describe("Request body (JSON string)")
+  //     }
+  //   },
+  //   async ({ url, method, headers = {}, body }) => {
+  //     try {
+  //       const response = await fetch(url, {
+  //         method,
+  //         headers: {
+  //           'Content-Type': 'application/json',
+  //           ...headers
+  //         },
+  //         body: body ? body : undefined
+  //       });
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
+  //       if (!response.ok) {
+  //         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  //       }
 
-        const data = await response.text();
+  //       const data = await response.text();
 
-        return {
-          content: [{
-            type: "text",
-            text: `Status: ${response.status}\nResponse: ${data}`
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{
-            type: "text",
-            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-          }],
-          isError: true
-        };
-      }
-    }
-  );
+  //       return {
+  //         content: [{
+  //           type: "text",
+  //           text: `Status: ${response.status}\nResponse: ${data}`
+  //         }]
+  //       };
+  //     } catch (error) {
+  //       return {
+  //         content: [{
+  //           type: "text",
+  //           text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+  //         }],
+  //         isError: true
+  //       };
+  //     }
+  //   }
+  // );
 
-  // Add LLM sampling tool (latest feature)
-  server.registerTool(
-    "summarize-content",
-    {
-      title: "Content Summarizer",
-      description: "Summarize text content using LLM sampling",
-      inputSchema: {
-        content: z.string().describe("Content to summarize"),
-        length: z.enum(["brief", "detailed", "bullet-points"]).default("brief")
-      }
-    },
-    async ({ content, length }) => {
-      try {
-        const promptMap = {
-          brief: "Provide a brief 2-3 sentence summary of this content:",
-          detailed: "Provide a comprehensive summary with key points and details:",
-          "bullet-points": "Summarize this content as bullet points with main ideas:"
-        };
+  // // Add LLM sampling tool (latest feature)
+  // server.registerTool(
+  //   "summarize-content",
+  //   {
+  //     title: "Content Summarizer",
+  //     description: "Summarize text content using LLM sampling",
+  //     inputSchema: {
+  //       content: z.string().describe("Content to summarize"),
+  //       length: z.enum(["brief", "detailed", "bullet-points"]).default("brief")
+  //     }
+  //   },
+  //   async ({ content, length }) => {
+  //     try {
+  //       const promptMap = {
+  //         brief: "Provide a brief 2-3 sentence summary of this content:",
+  //         detailed: "Provide a comprehensive summary with key points and details:",
+  //         "bullet-points": "Summarize this content as bullet points with main ideas:"
+  //       };
 
-        const response = await server.server.createMessage({
-          messages: [{
-            role: "user",
-            content: {
-              type: "text",
-              text: `${promptMap[length]}\n\n${content}`
-            }
-          }],
-          maxTokens: length === "detailed" ? 800 : 400
-        });
+  //       const response = await server.server.createMessage({
+  //         messages: [{
+  //           role: "user",
+  //           content: {
+  //             type: "text",
+  //             text: `${promptMap[length]}\n\n${content}`
+  //           }
+  //         }],
+  //         maxTokens: length === "detailed" ? 800 : 400
+  //       });
 
-        return {
-          content: [{
-            type: "text",
-            text: response.content.type === "text"
-              ? response.content.text
-              : "Unable to generate summary"
-          }]
-        };
-      } catch (error) {
-        return {
-          content: [{
-            type: "text",
-            text: `Summarization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-          }],
-          isError: true
-        };
-      }
-    }
-  );
+  //       return {
+  //         content: [{
+  //           type: "text",
+  //           text: response.content.type === "text"
+  //             ? response.content.text
+  //             : "Unable to generate summary"
+  //         }]
+  //       };
+  //     } catch (error) {
+  //       return {
+  //         content: [{
+  //           type: "text",
+  //           text: `Summarization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+  //         }],
+  //         isError: true
+  //       };
+  //     }
+  //   }
+  // );
 
   // Add Star Wars API tool
   server.registerTool(
