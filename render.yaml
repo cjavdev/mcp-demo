@@ -1,11 +1,10 @@
 services:
   - type: web
     name: mcp-demo
-    runtime: node
     plan: starter
     region: oregon
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: bun install
+    startCommand: bun start
     envVars:
       - key: NODE_ENV
         value: production

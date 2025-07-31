@@ -2,21 +2,20 @@
   "name": "example-mcp-server",
   "version": "0.0.1",
   "description": "Example MCP server using the latest libraries and patterns",
-  "main": "dist/server.js",
+  "main": "src/server.ts",
   "engines": {
-    "node": ">=18.0.0"
+    "bun": ">=1.0.0"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
-    "start:stdio": "tsx src/stdio-server.ts",
-    "start:http": "tsx src/http-server.ts",
-    "test": "tsx src/test-client.ts",
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts",
+    "start:stdio": "bun src/stdio-server.ts",
+    "start:http": "bun src/http-server.ts",
+    "test": "bun src/test-client.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
-    "type-check": "tsc --noEmit",
-    "clean": "rm -rf dist",
-    "build": "tsc"
+    "type-check": "bun --check src/server.ts",
+    "clean": "rm -rf dist"
   },
   "keywords": [
     "mcp",
