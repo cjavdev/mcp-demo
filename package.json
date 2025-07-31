@@ -7,7 +7,6 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "tsc",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "start:stdio": "tsx src/stdio-server.ts",
