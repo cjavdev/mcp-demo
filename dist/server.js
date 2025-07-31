@@ -21,7 +21,7 @@ const app = (0, express_1.default)();
 app.use(express_1.default.json());
 // Configure CORS for browser clients (latest requirements)
 app.use((0, cors_1.default)({
-    origin: ((typeof Bun !== 'undefined' ? Bun.env.NODE_ENV : process?.env?.NODE_ENV)) === 'production'
+    origin: (globalThis.Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production'
         ? ['https://mcp.demo.cjav.dev']
         : '*',
     exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
@@ -268,8 +268,8 @@ app.post('/mcp', async (req, res) => {
                     console.log(`📱 New session initialized: ${sessionId}`);
                 },
                 // Enable DNS rebinding protection for security
-                enableDnsRebindingProtection: ((typeof Bun !== 'undefined' ? Bun.env.NODE_ENV : process?.env?.NODE_ENV)) === 'production',
-                allowedHosts: ((typeof Bun !== 'undefined' ? Bun.env.NODE_ENV : process?.env?.NODE_ENV)) === 'production'
+                enableDnsRebindingProtection: (globalThis.Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production',
+                allowedHosts: (globalThis.Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production'
                     ? ['yourdomain.com', 'www.yourdomain.com']
                     : ['127.0.0.1', 'localhost']
             });
@@ -340,12 +340,12 @@ app.get('/health', (req, res) => {
     });
 });
 // Start server
-const PORT = (typeof Bun !== 'undefined' ? Bun.env.PORT : process?.env?.PORT) || 3000;
+const PORT = (globalThis.Bun?.env?.PORT || process?.env?.PORT) || 3000;
 app.listen(PORT, () => {
     console.log(`🌐 Streamable HTTP MCP Server running on port ${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/health`);
     console.log(`🔗 MCP endpoint: http://localhost:${PORT}/mcp`);
-    console.log(`🛡️ DNS protection: ${((typeof Bun !== 'undefined' ? Bun.env.NODE_ENV : process?.env?.NODE_ENV)) === 'production' ? 'enabled' : 'disabled'}`);
+    console.log(`🛡️ DNS protection: ${(globalThis.Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production' ? 'enabled' : 'disabled'}`);
 });
 // Graceful shutdown - works in both Node.js and Bun
 const gracefulShutdown = async () => {
