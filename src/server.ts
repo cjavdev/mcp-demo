@@ -12,7 +12,7 @@ app.use(express.json());
 // Configure CORS for browser clients (latest requirements)
 app.use(cors({
   origin: Bun.env.NODE_ENV === 'production'
-    ? ['https://mcp.demo.cjav.dev']
+    ? ['https://mcp.demo.cjav.dev', 'http://mcp.demo.cjav.dev']
     : '*',
   exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
   allowedHeaders: ['Content-Type', 'mcp-session-id'],
@@ -256,10 +256,9 @@ app.post('/mcp', async (req: Request, res: Response) => {
           transports[sessionId] = transport;
           console.log(`📱 New session initialized: ${sessionId}`);
         },
-        // Enable DNS rebinding protection for security
-          enableDnsRebindingProtection: Bun.env.NODE_ENV === 'production',
-  allowedHosts: Bun.env.NODE_ENV === 'production'
-          ? ['yourdomain.com', 'www.yourdomain.com']
+        enableDnsRebindingProtection: Bun.env.NODE_ENV === 'production',
+        allowedHosts: Bun.env.NODE_ENV === 'production'
+          ? ['mcp.demo.cjav.dev', 'demo.cjav.dev']
           : ['127.0.0.1', 'localhost']
       });
 
