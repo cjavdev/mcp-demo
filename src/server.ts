@@ -9,11 +9,28 @@ import { z } from "zod";
 const app = express();
 app.use(express.json());
 
+// Environment configuration with fallbacks
+const env = {
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  PORT: process.env.PORT || '3000',
+  ALLOWED_DOMAINS: process.env.ALLOWED_DOMAINS
+    ? process.env.ALLOWED_DOMAINS.split(',').map(d => d.trim())
+    : ['mcp.demo.cjav.dev']
+};
+
 // Configure CORS for browser clients (latest requirements)
+const getAllowedOrigins = () => {
+  if (env.NODE_ENV !== 'production') return '*';
+
+  const origins: string[] = [];
+  env.ALLOWED_DOMAINS.forEach(domain => {
+    origins.push(`https://${domain}`, `http://${domain}`);
+  });
+  return origins;
+};
+
 app.use(cors({
-  origin: Bun.env.NODE_ENV === 'production'
-    ? ['https://mcp.demo.cjav.dev', 'http://mcp.demo.cjav.dev']
-    : '*',
+  origin: getAllowedOrigins(),
   exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
   allowedHeaders: ['Content-Type', 'mcp-session-id'],
   methods: ['GET', 'POST', 'DELETE']
@@ -39,104 +56,6 @@ function createMcpServer(): McpServer {
       ]
     }
   );
-
-  // // Add production-ready API tool
-  // server.registerTool(
-  //   "fetch-data",
-  //   {
-  //     title: "External API Fetcher",
-  //     description: "Fetch data from external APIs with error handling",
-  //     inputSchema: {
-  //       url: z.string().url().describe("API endpoint URL"),
-  //       method: z.enum(["GET", "POST", "PUT", "DELETE"]).default("GET"),
-  //       headers: z.record(z.string()).optional().describe("HTTP headers"),
-  //       body: z.string().optional().describe("Request body (JSON string)")
-  //     }
-  //   },
-  //   async ({ url, method, headers = {}, body }) => {
-  //     try {
-  //       const response = await fetch(url, {
-  //         method,
-  //         headers: {
-  //           'Content-Type': 'application/json',
-  //           ...headers
-  //         },
-  //         body: body ? body : undefined
-  //       });
-
-  //       if (!response.ok) {
-  //         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  //       }
-
-  //       const data = await response.text();
-
-  //       return {
-  //         content: [{
-  //           type: "text",
-  //           text: `Status: ${response.status}\nResponse: ${data}`
-  //         }]
-  //       };
-  //     } catch (error) {
-  //       return {
-  //         content: [{
-  //           type: "text",
-  //           text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-  //         }],
-  //         isError: true
-  //       };
-  //     }
-  //   }
-  // );
-
-  // // Add LLM sampling tool (latest feature)
-  // server.registerTool(
-  //   "summarize-content",
-  //   {
-  //     title: "Content Summarizer",
-  //     description: "Summarize text content using LLM sampling",
-  //     inputSchema: {
-  //       content: z.string().describe("Content to summarize"),
-  //       length: z.enum(["brief", "detailed", "bullet-points"]).default("brief")
-  //     }
-  //   },
-  //   async ({ content, length }) => {
-  //     try {
-  //       const promptMap = {
-  //         brief: "Provide a brief 2-3 sentence summary of this content:",
-  //         detailed: "Provide a comprehensive summary with key points and details:",
-  //         "bullet-points": "Summarize this content as bullet points with main ideas:"
-  //       };
-
-  //       const response = await server.server.createMessage({
-  //         messages: [{
-  //           role: "user",
-  //           content: {
-  //             type: "text",
-  //             text: `${promptMap[length]}\n\n${content}`
-  //           }
-  //         }],
-  //         maxTokens: length === "detailed" ? 800 : 400
-  //       });
-
-  //       return {
-  //         content: [{
-  //           type: "text",
-  //           text: response.content.type === "text"
-  //             ? response.content.text
-  //             : "Unable to generate summary"
-  //         }]
-  //       };
-  //     } catch (error) {
-  //       return {
-  //         content: [{
-  //           type: "text",
-  //           text: `Summarization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-  //         }],
-  //         isError: true
-  //       };
-  //     }
-  //   }
-  // );
 
   // Add Star Wars API tool
   server.registerTool(
@@ -256,9 +175,9 @@ app.post('/mcp', async (req: Request, res: Response) => {
           transports[sessionId] = transport;
           console.log(`📱 New session initialized: ${sessionId}`);
         },
-        enableDnsRebindingProtection: Bun.env.NODE_ENV === 'production',
-        allowedHosts: Bun.env.NODE_ENV === 'production'
-          ? ['mcp.demo.cjav.dev', 'demo.cjav.dev']
+        enableDnsRebindingProtection: env.NODE_ENV === 'production',
+        allowedHosts: env.NODE_ENV === 'production'
+          ? env.ALLOWED_DOMAINS
           : ['127.0.0.1', 'localhost']
       });
 
@@ -346,12 +265,13 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Start server
-const PORT = Bun.env.PORT || 3000;
+const PORT = parseInt(env.PORT, 10);
 app.listen(PORT, () => {
   console.log(`🌐 Streamable HTTP MCP Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 MCP endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`🛡️ DNS protection: ${Bun.env.NODE_ENV === 'production' ? 'enabled' : 'disabled'}`);
+  console.log(`🛡️ DNS protection: ${env.NODE_ENV === 'production' ? 'enabled' : 'disabled'}`);
+  console.log(`🔒 Allowed domains: ${env.ALLOWED_DOMAINS.join(', ')}`);
 });
 
 // Graceful shutdown for Bun

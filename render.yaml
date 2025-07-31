@@ -8,5 +8,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: ALLOWED_DOMAINS
+        value: mcp.demo.cjav.dev
     domains:
       - mcp.demo.cjav.dev

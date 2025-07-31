@@ -77026,8 +77026,22 @@ class StreamableHTTPServerTransport {
 // src/server.ts
 var app = import_express.default();
 app.use(import_express.default.json());
+var env = {
+  NODE_ENV: "development",
+  PORT: process.env.PORT || "3000",
+  ALLOWED_DOMAINS: process.env.ALLOWED_DOMAINS ? process.env.ALLOWED_DOMAINS.split(",").map((d) => d.trim()) : ["mcp.demo.cjav.dev"]
+};
+var getAllowedOrigins = () => {
+  if (env.NODE_ENV !== "production")
+    return "*";
+  const origins = [];
+  env.ALLOWED_DOMAINS.forEach((domain) => {
+    origins.push(`https://${domain}`, `http://${domain}`);
+  });
+  return origins;
+};
 app.use(import_cors.default({
-  origin: Bun.env.NODE_ENV === "production" ? ["https://mcp.demo.cjav.dev"] : "*",
+  origin: getAllowedOrigins(),
   exposedHeaders: ["Mcp-Session-Id"],
   allowedHeaders: ["Content-Type", "mcp-session-id"],
   methods: ["GET", "POST", "DELETE"]
@@ -77035,7 +77049,7 @@ app.use(import_cors.default({
 var transports = {};
 function createMcpServer() {
   const server = new McpServer({
-    name: "production-mcp-server",
+    name: "starwars-mcp-server",
     version: "1.0.0"
   }, {
     debouncedNotificationMethods: [
@@ -77048,8 +77062,8 @@ function createMcpServer() {
     title: "Star Wars Information",
     description: "Get information about Star Wars films, characters, planets, starships, vehicles, and species from SWAPI",
     inputSchema: {
-      resource: exports_external.enum(["films", "people", "planets", "species", "starships", "vehicles"]).describe("Type of Star Wars resource to query"),
-      id: exports_external.number().optional().describe("Specific ID to get individual resource (omit to get all)"),
+      resource: exports_external.enum(["films", "people", "planets", "species", "starships", "vehicles"]).describe("Type of Star Wars resource to query. Required."),
+      id: exports_external.number().optional().describe("Specific integer ID to get individual resource (omit to get all)"),
       search: exports_external.string().optional().describe("Search term to filter results by name")
     }
   }, async ({ resource, id, search }) => {
@@ -77067,7 +77081,7 @@ function createMcpServer() {
       const data = await response.json();
       let formattedData;
       if (data.results) {
-        formattedData = `Found ${data.count} results for ${resource}:
+        formattedData = `Found ${data.count} StarWars results for ${resource}:
 
 `;
         data.results.forEach((item, index) => {
@@ -77191,20 +77205,23 @@ ${data.opening_crawl}
   return server;
 }
 app.post("/mcp", async (req, res) => {
+  console.log("Request received at /mcp POST");
   const sessionId = req.headers["mcp-session-id"];
   let transport;
   try {
     if (sessionId && transports[sessionId]) {
+      console.log(`Reusing existing transport: ${sessionId}`);
       transport = transports[sessionId];
     } else if (!sessionId && isInitializeRequest(req.body)) {
+      console.log("New initialization request");
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sessionId2) => {
           transports[sessionId2] = transport;
           console.log(`\uD83D\uDCF1 New session initialized: ${sessionId2}`);
         },
-        enableDnsRebindingProtection: Bun.env.NODE_ENV === "production",
-        allowedHosts: Bun.env.NODE_ENV === "production" ? ["yourdomain.com", "www.yourdomain.com"] : ["127.0.0.1", "localhost"]
+        enableDnsRebindingProtection: env.NODE_ENV === "production",
+        allowedHosts: env.NODE_ENV === "production" ? env.ALLOWED_DOMAINS : ["127.0.0.1", "localhost"]
       });
       transport.onclose = () => {
         if (transport.sessionId) {
@@ -77240,7 +77257,12 @@ app.post("/mcp", async (req, res) => {
     }
   }
 });
+app.get("/", (req, res) => {
+  console.log("Request received at /");
+  res.send("This is a demo MCP server. Use the /mcp endpoint for Streamable HTTP MCP Server.");
+});
 app.get("/mcp", async (req, res) => {
+  console.log("Request received at /mcp");
   const sessionId = req.headers["mcp-session-id"];
   if (!sessionId || !transports[sessionId]) {
     res.status(400).send("Invalid or missing session ID");
@@ -77250,6 +77272,7 @@ app.get("/mcp", async (req, res) => {
   await transport.handleRequest(req, res);
 });
 app.delete("/mcp", async (req, res) => {
+  console.log("Request received at /mcp DELETE");
   const sessionId = req.headers["mcp-session-id"];
   if (!sessionId || !transports[sessionId]) {
     res.status(400).send("Invalid or missing session ID");
@@ -77259,6 +77282,7 @@ app.delete("/mcp", async (req, res) => {
   await transport.handleRequest(req, res);
 });
 app.get("/health", (req, res) => {
+  console.log("Request received at /health");
   res.json({
     status: "healthy",
     timestamp: new Date().toISOString(),
@@ -77266,12 +77290,13 @@ app.get("/health", (req, res) => {
     version: "1.0.0"
   });
 });
-var PORT = Bun.env.PORT || 3000;
+var PORT = parseInt(env.PORT, 10);
 app.listen(PORT, () => {
   console.log(`\uD83C\uDF10 Streamable HTTP MCP Server running on port ${PORT}`);
   console.log(`\uD83D\uDCCA Health check: http://localhost:${PORT}/health`);
   console.log(`\uD83D\uDD17 MCP endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`\uD83D\uDEE1️ DNS protection: ${Bun.env.NODE_ENV === "production" ? "enabled" : "disabled"}`);
+  console.log(`\uD83D\uDEE1️ DNS protection: ${env.NODE_ENV === "production" ? "enabled" : "disabled"}`);
+  console.log(`\uD83D\uDD12 Allowed domains: ${env.ALLOWED_DOMAINS.join(", ")}`);
 });
 var gracefulShutdown = async () => {
   console.log(`
