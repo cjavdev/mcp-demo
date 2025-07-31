@@ -1,7 +1,7 @@
 {
-  "name": "modern-mcp-server",
-  "version": "1.0.0",
-  "description": "Modern MCP server using the latest libraries and patterns",
+  "name": "example-mcp-server",
+  "version": "0.0.1",
+  "description": "Example MCP server using the latest libraries and patterns",
   "main": "dist/server.js",
   "engines": {
     "node": ">=18.0.0"
@@ -15,7 +15,8 @@
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "type-check": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "build": "tsc"
   },
   "keywords": [
     "mcp",
@@ -46,7 +47,7 @@
     "README.md",
     "LICENSE"
   ],
-  "author": "Your Name",
+  "author": "CJ Avilla",
   "license": "MIT",
   "repository": {
     "type": "git",
