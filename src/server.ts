@@ -18,7 +18,7 @@ app.use(express.json());
 
 // Configure CORS for browser clients (latest requirements)
 app.use(cors({
-  origin: (Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production'
+  origin: ((typeof Bun !== 'undefined' ? Bun.env.NODE_ENV : process?.env?.NODE_ENV)) === 'production'
     ? ['https://mcp.demo.cjav.dev']
     : '*',
   exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
@@ -261,8 +261,8 @@ app.post('/mcp', async (req: Request, res: Response) => {
           console.log(`📱 New session initialized: ${sessionId}`);
         },
         // Enable DNS rebinding protection for security
-          enableDnsRebindingProtection: (Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production',
-  allowedHosts: (Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production'
+          enableDnsRebindingProtection: ((typeof Bun !== 'undefined' ? Bun.env.NODE_ENV : process?.env?.NODE_ENV)) === 'production',
+  allowedHosts: ((typeof Bun !== 'undefined' ? Bun.env.NODE_ENV : process?.env?.NODE_ENV)) === 'production'
           ? ['yourdomain.com', 'www.yourdomain.com']
           : ['127.0.0.1', 'localhost']
       });
@@ -342,12 +342,12 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Start server
-const PORT = (Bun?.env?.PORT || process?.env?.PORT) || 3000;
+const PORT = (typeof Bun !== 'undefined' ? Bun.env.PORT : process?.env?.PORT) || 3000;
 app.listen(PORT, () => {
   console.log(`🌐 Streamable HTTP MCP Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 MCP endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`🛡️ DNS protection: ${(Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production' ? 'enabled' : 'disabled'}`);
+  console.log(`🛡️ DNS protection: ${((typeof Bun !== 'undefined' ? Bun.env.NODE_ENV : process?.env?.NODE_ENV)) === 'production' ? 'enabled' : 'disabled'}`);
 });
 
 // Graceful shutdown - works in both Node.js and Bun
