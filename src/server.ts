@@ -1,7 +1,13 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
-import * as crypto from "crypto";
-const { randomUUID } = crypto;
+// Bun-compatible UUID generation
+const randomUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
@@ -12,7 +18,7 @@ app.use(express.json());
 
 // Configure CORS for browser clients (latest requirements)
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
+  origin: (Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production'
     ? ['https://mcp.demo.cjav.dev']
     : '*',
   exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
@@ -255,8 +261,8 @@ app.post('/mcp', async (req: Request, res: Response) => {
           console.log(`📱 New session initialized: ${sessionId}`);
         },
         // Enable DNS rebinding protection for security
-        enableDnsRebindingProtection: process.env.NODE_ENV === 'production',
-        allowedHosts: process.env.NODE_ENV === 'production'
+          enableDnsRebindingProtection: (Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production',
+  allowedHosts: (Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production'
           ? ['yourdomain.com', 'www.yourdomain.com']
           : ['127.0.0.1', 'localhost']
       });
@@ -336,22 +342,24 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = (Bun?.env?.PORT || process?.env?.PORT) || 3000;
 app.listen(PORT, () => {
   console.log(`🌐 Streamable HTTP MCP Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 MCP endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`🛡️ DNS protection: ${process.env.NODE_ENV === 'production' ? 'enabled' : 'disabled'}`);
+  console.log(`🛡️ DNS protection: ${(Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production' ? 'enabled' : 'disabled'}`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
-
+// Graceful shutdown - works in both Node.js and Bun
+const gracefulShutdown = async () => {
+  console.log('\n🛑 Shutting down gracefully...');
   // Close all active transports
-  await Promise.all(
-    Object.values(transports).map(transport => transport.close())
-  );
+  await Promise.all(Object.values(transports).map(transport => transport.close()));
+  if (typeof process !== 'undefined') {
+    process.exit(0);
+  }
+};
 
-  process.exit(0);
-});
+if (typeof process !== 'undefined') {
+  process.on('SIGTERM', gracefulShutdown);
+}

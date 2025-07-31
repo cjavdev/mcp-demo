@@ -1,45 +1,18 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
-const crypto = __importStar(require("crypto"));
-const { randomUUID } = crypto;
+// Bun-compatible UUID generation
+const randomUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0;
+        const v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
 const mcp_js_1 = require("@modelcontextprotocol/sdk/server/mcp.js");
 const streamableHttp_js_1 = require("@modelcontextprotocol/sdk/server/streamableHttp.js");
 const types_js_1 = require("@modelcontextprotocol/sdk/types.js");
@@ -48,7 +21,7 @@ const app = (0, express_1.default)();
 app.use(express_1.default.json());
 // Configure CORS for browser clients (latest requirements)
 app.use((0, cors_1.default)({
-    origin: process.env.NODE_ENV === 'production'
+    origin: (Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production'
         ? ['https://mcp.demo.cjav.dev']
         : '*',
     exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
@@ -295,8 +268,8 @@ app.post('/mcp', async (req, res) => {
                     console.log(`📱 New session initialized: ${sessionId}`);
                 },
                 // Enable DNS rebinding protection for security
-                enableDnsRebindingProtection: process.env.NODE_ENV === 'production',
-                allowedHosts: process.env.NODE_ENV === 'production'
+                enableDnsRebindingProtection: (Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production',
+                allowedHosts: (Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production'
                     ? ['yourdomain.com', 'www.yourdomain.com']
                     : ['127.0.0.1', 'localhost']
             });
@@ -367,17 +340,22 @@ app.get('/health', (req, res) => {
     });
 });
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = (Bun?.env?.PORT || process?.env?.PORT) || 3000;
 app.listen(PORT, () => {
     console.log(`🌐 Streamable HTTP MCP Server running on port ${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/health`);
     console.log(`🔗 MCP endpoint: http://localhost:${PORT}/mcp`);
-    console.log(`🛡️ DNS protection: ${process.env.NODE_ENV === 'production' ? 'enabled' : 'disabled'}`);
+    console.log(`🛡️ DNS protection: ${(Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production' ? 'enabled' : 'disabled'}`);
 });
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-    console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+// Graceful shutdown - works in both Node.js and Bun
+const gracefulShutdown = async () => {
+    console.log('\n🛑 Shutting down gracefully...');
     // Close all active transports
     await Promise.all(Object.values(transports).map(transport => transport.close()));
-    process.exit(0);
-});
+    if (typeof process !== 'undefined') {
+        process.exit(0);
+    }
+};
+if (typeof process !== 'undefined') {
+    process.on('SIGTERM', gracefulShutdown);
+}

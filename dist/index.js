@@ -230,19 +230,23 @@ async function startServer() {
     }
     catch (error) {
         console.error("❌ Failed to start MCP server:", error);
-        process.exit(1);
+        if (typeof process !== 'undefined') {
+            process.exit(1);
+        }
     }
 }
 // Handle graceful shutdown
-process.on('SIGINT', async () => {
-    console.log("\n🛑 Shutting down MCP server...");
+// Graceful shutdown - works in both Node.js and Bun
+const gracefulShutdown = async () => {
+    console.log('\n🛑 Shutting down MCP server...');
     await server.close();
-    process.exit(0);
-});
-process.on('SIGTERM', async () => {
-    console.log("\n🛑 Shutting down MCP server...");
-    await server.close();
-    process.exit(0);
-});
+    if (typeof process !== 'undefined') {
+        process.exit(0);
+    }
+};
+if (typeof process !== 'undefined') {
+    process.on('SIGINT', gracefulShutdown);
+    process.on('SIGTERM', gracefulShutdown);
+}
 // Start the server
 startServer().catch(console.error);
