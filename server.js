@@ -24,7 +24,7 @@ app.use(express_1.default.json());
 // Configure CORS for browser clients (latest requirements)
 app.use((0, cors_1.default)({
     origin: process.env.NODE_ENV === 'production'
-        ? ['https://yourdomain.com', 'https://www.yourdomain.com']
+        ? ['https://mcp.demo.cjav.dev', 'https://www.mcp.demo.cjav.dev']
         : '*',
     exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
     allowedHeaders: ['Content-Type', 'mcp-session-id'],
