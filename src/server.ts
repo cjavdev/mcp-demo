@@ -27,7 +27,7 @@ const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 function createMcpServer(): McpServer {
   const server = new McpServer(
     {
-      name: "production-mcp-server",
+      name: "starwars-mcp-server",
       version: "1.0.0"
     },
     {
@@ -145,8 +145,8 @@ function createMcpServer(): McpServer {
       title: "Star Wars Information",
       description: "Get information about Star Wars films, characters, planets, starships, vehicles, and species from SWAPI",
       inputSchema: {
-        resource: z.enum(["films", "people", "planets", "species", "starships", "vehicles"]).describe("Type of Star Wars resource to query"),
-        id: z.number().optional().describe("Specific ID to get individual resource (omit to get all)"),
+        resource: z.enum(["films", "people", "planets", "species", "starships", "vehicles"]).describe("Type of Star Wars resource to query. Required."),
+        id: z.number().optional().describe("Specific integer ID to get individual resource (omit to get all)"),
         search: z.string().optional().describe("Search term to filter results by name")
       }
     },
@@ -173,7 +173,7 @@ function createMcpServer(): McpServer {
 
         if (data.results) {
           // Multiple results
-          formattedData = `Found ${data.count} results for ${resource}:\n\n`;
+          formattedData = `Found ${data.count} StarWars results for ${resource}:\n\n`;
           data.results.forEach((item: any, index: number) => {
             formattedData += `${index + 1}. ${item.name || item.title}\n`;
             if (item.episode_id) formattedData += `   Episode: ${item.episode_id}\n`;
@@ -238,14 +238,17 @@ function createMcpServer(): McpServer {
 
 // Handle POST requests (client-to-server communication)
 app.post('/mcp', async (req: Request, res: Response) => {
+  console.log("Request received at /mcp POST");
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
   let transport: StreamableHTTPServerTransport;
 
   try {
     if (sessionId && transports[sessionId]) {
+      console.log(`Reusing existing transport: ${sessionId}`);
       // Reuse existing transport
       transport = transports[sessionId];
     } else if (!sessionId && isInitializeRequest(req.body)) {
+      console.log("New initialization request");
       // New initialization request
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
@@ -298,8 +301,15 @@ app.post('/mcp', async (req: Request, res: Response) => {
   }
 });
 
+
+app.get('/', (req: Request, res: Response) => {
+  console.log("Request received at /");
+  res.send('This is a demo MCP server. Use the /mcp endpoint for Streamable HTTP MCP Server.');
+});
+
 // Handle GET requests (server-to-client notifications via SSE)
 app.get('/mcp', async (req: Request, res: Response) => {
+  console.log("Request received at /mcp");
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
   if (!sessionId || !transports[sessionId]) {
@@ -313,6 +323,7 @@ app.get('/mcp', async (req: Request, res: Response) => {
 
 // Handle DELETE requests (session termination)
 app.delete('/mcp', async (req: Request, res: Response) => {
+  console.log("Request received at /mcp DELETE");
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
   if (!sessionId || !transports[sessionId]) {
@@ -326,6 +337,7 @@ app.delete('/mcp', async (req: Request, res: Response) => {
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
+  console.log("Request received at /health");
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
