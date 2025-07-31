@@ -273,8 +273,8 @@ async function startServer() {
 
   } catch (error) {
     console.error("❌ Failed to start MCP server:", error);
-    if (typeof process !== 'undefined') {
-      process.exit(1);
+    if ((globalThis as any).process) {
+      (globalThis as any).process.exit(1);
     }
   }
 }
@@ -284,14 +284,14 @@ async function startServer() {
 const gracefulShutdown = async () => {
   console.log('\n🛑 Shutting down MCP server...');
   await server.close();
-  if (typeof process !== 'undefined') {
-    process.exit(0);
+  if ((globalThis as any).process) {
+    (globalThis as any).process.exit(0);
   }
 };
 
-if (typeof process !== 'undefined') {
-  process.on('SIGINT', gracefulShutdown);
-  process.on('SIGTERM', gracefulShutdown);
+if ((globalThis as any).process) {
+  (globalThis as any).process.on('SIGINT', gracefulShutdown);
+  (globalThis as any).process.on('SIGTERM', gracefulShutdown);
 }
 
 // Start the server

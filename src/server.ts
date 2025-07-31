@@ -18,7 +18,7 @@ app.use(express.json());
 
 // Configure CORS for browser clients (latest requirements)
 app.use(cors({
-  origin: ((globalThis as any).Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production'
+  origin: ((globalThis as any).Bun?.env?.NODE_ENV || (globalThis as any).process?.env?.NODE_ENV) === 'production'
     ? ['https://mcp.demo.cjav.dev']
     : '*',
   exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
@@ -261,8 +261,8 @@ app.post('/mcp', async (req: Request, res: Response) => {
           console.log(`📱 New session initialized: ${sessionId}`);
         },
         // Enable DNS rebinding protection for security
-          enableDnsRebindingProtection: ((globalThis as any).Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production',
-  allowedHosts: ((globalThis as any).Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production'
+          enableDnsRebindingProtection: ((globalThis as any).Bun?.env?.NODE_ENV || (globalThis as any).process?.env?.NODE_ENV) === 'production',
+  allowedHosts: ((globalThis as any).Bun?.env?.NODE_ENV || (globalThis as any).process?.env?.NODE_ENV) === 'production'
           ? ['yourdomain.com', 'www.yourdomain.com']
           : ['127.0.0.1', 'localhost']
       });
@@ -342,12 +342,12 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Start server
-const PORT = ((globalThis as any).Bun?.env?.PORT || process?.env?.PORT) || 3000;
+const PORT = ((globalThis as any).Bun?.env?.PORT || (globalThis as any).process?.env?.PORT) || 3000;
 app.listen(PORT, () => {
   console.log(`🌐 Streamable HTTP MCP Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 MCP endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`🛡️ DNS protection: ${((globalThis as any).Bun?.env?.NODE_ENV || process?.env?.NODE_ENV) === 'production' ? 'enabled' : 'disabled'}`);
+  console.log(`🛡️ DNS protection: ${((globalThis as any).Bun?.env?.NODE_ENV || (globalThis as any).process?.env?.NODE_ENV) === 'production' ? 'enabled' : 'disabled'}`);
 });
 
 // Graceful shutdown - works in both Node.js and Bun
@@ -355,11 +355,11 @@ const gracefulShutdown = async () => {
   console.log('\n🛑 Shutting down gracefully...');
   // Close all active transports
   await Promise.all(Object.values(transports).map(transport => transport.close()));
-  if (typeof process !== 'undefined') {
-    process.exit(0);
+  if ((globalThis as any).process) {
+    (globalThis as any).process.exit(0);
   }
 };
 
-if (typeof process !== 'undefined') {
-  process.on('SIGTERM', gracefulShutdown);
+if ((globalThis as any).process) {
+  (globalThis as any).process.on('SIGTERM', gracefulShutdown);
 }
