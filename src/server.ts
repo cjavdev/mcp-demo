@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
-import cors from "cors";
+// import cors from "cors";
 import { randomUUID } from "crypto";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
@@ -9,38 +9,37 @@ import { z } from "zod";
 const app = express();
 app.use(express.json());
 
-// Environment configuration with fallbacks
+// Environment configuration
 const env = {
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: process.env.PORT || '3000',
-  ALLOWED_DOMAINS: process.env.ALLOWED_DOMAINS
-    ? process.env.ALLOWED_DOMAINS.split(',').map(d => d.trim())
-    : ['mcp.demo.cjav.dev']
+//   NODE_ENV: process.env.NODE_ENV || 'development',
+//   PORT: process.env.PORT || '3000',
+  ALLOWED_DOMAINS: process.env.NODE_ENV === 'production'
+    ? (process.env.ALLOWED_DOMAINS?.split(',').map(d => d.trim()) || [])
+    : ['localhost:3000', '127.0.0.1:3000']
 };
 
-// Configure CORS for browser clients (latest requirements)
-const getAllowedOrigins = () => {
-  if (env.NODE_ENV !== 'production') return '*';
+// // Configure CORS for browser clients (latest requirements)
+// const getAllowedOrigins = () => {
+//   if (env.NODE_ENV !== 'production') return '*';
 
-  const origins: string[] = [];
-  env.ALLOWED_DOMAINS.forEach(domain => {
-    origins.push(`https://${domain}`, `http://${domain}`);
-  });
-  return origins;
-};
+//   const origins: string[] = [];
+//   env.ALLOWED_DOMAINS.forEach(domain => {
+//     origins.push(`https://${domain}`, `http://${domain}`);
+//   });
+//   return origins;
+// };
 
-app.use(cors({
-  origin: getAllowedOrigins(),
-  exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
-  allowedHeaders: ['Content-Type', 'mcp-session-id'],
-  methods: ['GET', 'POST', 'DELETE']
-}));
+// app.use(cors({
+//   origin: getAllowedOrigins(),
+//   exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
+//   allowedHeaders: ['Content-Type', 'mcp-session-id'],
+//   methods: ['GET', 'POST', 'DELETE']
+// }));
 
 // Session management for stateful connections
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
 // Create and configure MCP server
-
 function createMcpServer(): McpServer {
   const server = new McpServer(
     {
@@ -55,6 +54,50 @@ function createMcpServer(): McpServer {
         'notifications/prompts/list_changed'
       ]
     }
+  );
+
+  server.registerTool("add",
+    {
+      title: "Addition Tool",
+      description: "Add two numbers",
+      inputSchema: { a: z.number(), b: z.number() }
+    },
+    async ({ a, b }) => ({
+      content: [{ type: "text", text: String(a + b) }]
+    })
+  );
+
+  server.registerResource(
+    "greeting",
+    new ResourceTemplate("greeting://{name}", { list: undefined }),
+    {
+      title: "Greeting Resource",      // Display name for UI
+      description: "Dynamic greeting generator"
+    },
+    async (uri, { name }) => ({
+      contents: [{
+        uri: uri.href,
+        text: `Hello, ${name}!`
+      }]
+    })
+  );
+
+  server.registerPrompt(
+    "review-code",
+    {
+      title: "Code Review",
+      description: "Review code for best practices and potential issues",
+      argsSchema: { code: z.string() }
+    },
+    ({ code }) => ({
+      messages: [{
+        role: "user",
+        content: {
+          type: "text",
+          text: `Please review this code:\n\n${code}`
+        }
+      }]
+    })
   );
 
   // Add Star Wars API tool
@@ -155,9 +198,11 @@ function createMcpServer(): McpServer {
   return server;
 }
 
-// Handle POST requests (client-to-server communication)
+// Initialze and start session connect requests
 app.post('/mcp', async (req: Request, res: Response) => {
-  console.log("Request received at /mcp POST");
+  console.log("POST Request received at /mcp");
+  console.log(JSON.stringify(req.body, null, 2));
+  console.log(req.headers);
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
   let transport: StreamableHTTPServerTransport;
 
@@ -175,10 +220,8 @@ app.post('/mcp', async (req: Request, res: Response) => {
           transports[sessionId] = transport;
           console.log(`📱 New session initialized: ${sessionId}`);
         },
-        enableDnsRebindingProtection: env.NODE_ENV === 'production',
-        allowedHosts: env.NODE_ENV === 'production'
-          ? env.ALLOWED_DOMAINS
-          : ['127.0.0.1', 'localhost']
+        enableDnsRebindingProtection: process.env.NODE_ENV === 'production',
+        allowedHosts: env.ALLOWED_DOMAINS
       });
 
       // Clean up transport when closed
@@ -220,14 +263,9 @@ app.post('/mcp', async (req: Request, res: Response) => {
 });
 
 
-app.get('/', (req: Request, res: Response) => {
-  console.log("Request received at /");
-  res.send('This is a demo MCP server. Use the /mcp endpoint for Streamable HTTP MCP Server.');
-});
-
-// Handle GET requests (server-to-client notifications via SSE)
+// Reconnect requests for existing sessions
 app.get('/mcp', async (req: Request, res: Response) => {
-  console.log("Request received at /mcp");
+  console.log("GET Request received at /mcp");
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
   if (!sessionId || !transports[sessionId]) {
@@ -239,9 +277,9 @@ app.get('/mcp', async (req: Request, res: Response) => {
   await transport.handleRequest(req, res);
 });
 
-// Handle DELETE requests (session termination)
+// Disconnect requests for existing sessions
 app.delete('/mcp', async (req: Request, res: Response) => {
-  console.log("Request received at /mcp DELETE");
+  console.log("DELETE Request received at /mcp");
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
   if (!sessionId || !transports[sessionId]) {
@@ -251,6 +289,12 @@ app.delete('/mcp', async (req: Request, res: Response) => {
 
   const transport = transports[sessionId];
   await transport.handleRequest(req, res);
+});
+
+
+app.get('/', (req: Request, res: Response) => {
+  console.log("GET Request received at /");
+  res.send('This is a demo MCP server. Use `/mcp` for Streamable HTTP.');
 });
 
 // Health check endpoint
@@ -265,16 +309,15 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Start server
-const PORT = parseInt(env.PORT, 10);
+const PORT = parseInt(process.env.PORT || '3000', 10);
 app.listen(PORT, () => {
   console.log(`🌐 Streamable HTTP MCP Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 MCP endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`🛡️ DNS protection: ${env.NODE_ENV === 'production' ? 'enabled' : 'disabled'}`);
-  console.log(`🔒 Allowed domains: ${env.ALLOWED_DOMAINS.join(', ')}`);
+  console.log(`🛡️ DNS protection: ${process.env.NODE_ENV === 'production' ? 'enabled' : 'disabled'}`);
+  console.log(`🔒 Allowed domains: ${process.env.ALLOWED_DOMAINS?.split(',').map(d => d.trim()).join(', ')}`);
 });
 
-// Graceful shutdown for Bun
 const gracefulShutdown = async () => {
   console.log('\n🛑 Shutting down gracefully...');
   // Close all active transports
