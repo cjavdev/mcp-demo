@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-// import cors from "cors";
+import cors from "cors";
 import { randomUUID } from "crypto";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -11,30 +11,28 @@ app.use(express.json());
 
 // Environment configuration
 const env = {
-//   NODE_ENV: process.env.NODE_ENV || 'development',
-//   PORT: process.env.PORT || '3000',
   ALLOWED_DOMAINS: process.env.NODE_ENV === 'production'
     ? (process.env.ALLOWED_DOMAINS?.split(',').map(d => d.trim()) || [])
     : ['localhost:3000', '127.0.0.1:3000']
 };
 
-// // Configure CORS for browser clients (latest requirements)
-// const getAllowedOrigins = () => {
-//   if (env.NODE_ENV !== 'production') return '*';
+// Configure CORS for browser clients (latest requirements)
+const getAllowedOrigins = () => {
+  if (process.env.NODE_ENV !== 'production') return '*';
 
-//   const origins: string[] = [];
-//   env.ALLOWED_DOMAINS.forEach(domain => {
-//     origins.push(`https://${domain}`, `http://${domain}`);
-//   });
-//   return origins;
-// };
+  const origins: string[] = [];
+  env.ALLOWED_DOMAINS.forEach(domain => {
+    origins.push(`https://${domain}`, `http://${domain}`);
+  });
+  return origins;
+};
 
-// app.use(cors({
-//   origin: getAllowedOrigins(),
-//   exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
-//   allowedHeaders: ['Content-Type', 'mcp-session-id'],
-//   methods: ['GET', 'POST', 'DELETE']
-// }));
+app.use(cors({
+  origin: getAllowedOrigins(),
+  exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
+  allowedHeaders: ['Content-Type', 'mcp-session-id'],
+  methods: ['GET', 'POST', 'DELETE']
+}));
 
 // Session management for stateful connections
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
