@@ -13,7 +13,7 @@ app.use(express.json());
 const env = {
   ALLOWED_DOMAINS: process.env.NODE_ENV === 'production'
     ? (process.env.ALLOWED_DOMAINS?.split(',').map(d => d.trim()) || [])
-    : ['localhost:3000', '127.0.0.1:3000']
+    : ['localhost:3000', '127.0.0.1:3000', '6eb2dca05ce6.ngrok-free.app:3000']
 };
 
 // Configure CORS for browser clients (latest requirements)
@@ -111,6 +111,7 @@ function createMcpServer(): McpServer {
       }
     },
     async ({ resource, id, search }) => {
+      console.log(`API Call to SWAPI ${resource}`);
       try {
         let url = `https://swapi.info/api/${resource}`;
 
@@ -175,12 +176,14 @@ function createMcpServer(): McpServer {
           if (data.opening_crawl) formattedData += `\nOpening Crawl:\n${data.opening_crawl}\n`;
         }
 
-        return {
+        const result = {
           content: [{
             type: "text",
             text: formattedData
           }]
         };
+        console.log(`SENDING: ${JSON.stringify(result, null, 2)}`);
+        return result;
       } catch (error) {
         return {
           content: [{
