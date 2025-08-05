@@ -3,6 +3,7 @@ import cors from "cors";
 import { randomUUID } from "crypto";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
@@ -98,29 +99,20 @@ function createMcpServer(): McpServer {
     })
   );
 
-  // Add Star Wars API tool
+  // 1. SEARCH TOOL (for discovery)
   server.registerTool(
-    "star-wars-info",
+    "search-star-wars",
     {
-      title: "Star Wars Information",
-      description: "Get information about Star Wars films, characters, planets, starships, vehicles, and species from SWAPI",
+      title: "Search Star Wars",
+      description: "Search for Star Wars films, characters, planets, starships, vehicles, and species",
       inputSchema: {
-        resource: z.enum(["films", "people", "planets", "species", "starships", "vehicles"]).describe("Type of Star Wars resource to query. Required."),
-        id: z.number().optional().describe("Specific integer ID to get individual resource (omit to get all)"),
-        search: z.string().optional().describe("Search term to filter results by name")
+        resource: z.enum(["films", "people", "planets", "species", "starships", "vehicles"]).describe("Type of Star Wars resource to search"),
+        query: z.string().describe("Search term to filter results by name")
       }
     },
-    async ({ resource, id, search }) => {
-      console.log(`API Call to SWAPI ${resource}`);
+    async ({ resource, query }) => {
       try {
-        let url = `https://swapi.info/api/${resource}`;
-
-        if (id) {
-          url += `/${id}`;
-        } else if (search) {
-          url += `?search=${encodeURIComponent(search)}`;
-        }
-
+        const url = `https://swapi.info/api/${resource}?search=${encodeURIComponent(query)}`;
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -129,72 +121,122 @@ function createMcpServer(): McpServer {
 
         const data = await response.json() as any;
 
-        // Format the response nicely
-        let formattedData: string;
-
-        if (data.results) {
-          // Multiple results
-          formattedData = `Found ${data.count} StarWars results for ${resource}:\n\n`;
-          data.results.forEach((item: any, index: number) => {
-            formattedData += `${index + 1}. ${item.name || item.title}\n`;
-            if (item.episode_id) formattedData += `   Episode: ${item.episode_id}\n`;
-            if (item.birth_year) formattedData += `   Birth Year: ${item.birth_year}\n`;
-            if (item.climate) formattedData += `   Climate: ${item.climate}\n`;
-            if (item.model) formattedData += `   Model: ${item.model}\n`;
-            if (item.classification) formattedData += `   Classification: ${item.classification}\n`;
-            formattedData += '\n';
+        if (data.results && data.results.length > 0) {
+          const results = data.results.map((item: any) => {
+            const id = item.url.split('/').filter(Boolean).pop();
+            return {
+              name: item.name || item.title,
+              id: id,
+              uri: `starwars://${resource}/${id}`
+            };
           });
+
+          return {
+            content: [{
+              type: "text",
+              text: `Found ${results.length} results:\n\n` +
+                    results.map((r: any) => `• ${r.name} (${r.uri})`).join('\n')
+            }]
+          };
         } else {
-          // Single result
-          formattedData = `${resource.charAt(0).toUpperCase() + resource.slice(1)} Information:\n\n`;
-          formattedData += `Name: ${data.name || data.title}\n`;
-
-          // Add relevant fields based on resource type
-          if (data.episode_id) formattedData += `Episode: ${data.episode_id}\n`;
-          if (data.director) formattedData += `Director: ${data.director}\n`;
-          if (data.release_date) formattedData += `Release Date: ${data.release_date}\n`;
-          if (data.birth_year) formattedData += `Birth Year: ${data.birth_year}\n`;
-          if (data.height) formattedData += `Height: ${data.height}cm\n`;
-          if (data.mass) formattedData += `Mass: ${data.mass}kg\n`;
-          if (data.hair_color) formattedData += `Hair Color: ${data.hair_color}\n`;
-          if (data.eye_color) formattedData += `Eye Color: ${data.eye_color}\n`;
-          if (data.gender) formattedData += `Gender: ${data.gender}\n`;
-          if (data.diameter) formattedData += `Diameter: ${data.diameter}km\n`;
-          if (data.climate) formattedData += `Climate: ${data.climate}\n`;
-          if (data.terrain) formattedData += `Terrain: ${data.terrain}\n`;
-          if (data.population) formattedData += `Population: ${data.population}\n`;
-          if (data.model) formattedData += `Model: ${data.model}\n`;
-          if (data.manufacturer) formattedData += `Manufacturer: ${data.manufacturer}\n`;
-          if (data.cost_in_credits) formattedData += `Cost: ${data.cost_in_credits} credits\n`;
-          if (data.length) formattedData += `Length: ${data.length}m\n`;
-          if (data.crew) formattedData += `Crew: ${data.crew}\n`;
-          if (data.passengers) formattedData += `Passengers: ${data.passengers}\n`;
-          if (data.classification) formattedData += `Classification: ${data.classification}\n`;
-          if (data.designation) formattedData += `Designation: ${data.designation}\n`;
-          if (data.average_height) formattedData += `Average Height: ${data.average_height}cm\n`;
-          if (data.language) formattedData += `Language: ${data.language}\n`;
-          if (data.opening_crawl) formattedData += `\nOpening Crawl:\n${data.opening_crawl}\n`;
+          return {
+            content: [{
+              type: "text",
+              text: `No results found for "${query}" in ${resource}`
+            }]
+          };
         }
-
-        const result = {
-          content: [{
-            type: "text",
-            text: formattedData
-          }]
-        };
-        console.log(`SENDING: ${JSON.stringify(result, null, 2)}`);
-        return result;
       } catch (error) {
         return {
           content: [{
             type: "text",
-            text: `Error fetching Star Wars data: ${error instanceof Error ? error.message : 'Unknown error'}`
+            text: `Error searching: ${error instanceof Error ? error.message : 'Unknown error'}`
           }],
           isError: true
         };
       }
     }
   );
+
+  // 2. RESOURCES (for individual data access)
+  const resourceTypes = ["films", "people", "planets", "species", "starships", "vehicles"];
+
+  resourceTypes.forEach(resourceType => {
+    server.registerResource(
+      `starwars-${resourceType}`,
+            new ResourceTemplate(`starwars://${resourceType}/{id}`, {
+        list: undefined  // Use search tool for discovery instead
+      }),
+      {
+        title: `Star Wars ${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)}`,
+        description: `Individual Star Wars ${resourceType} data from SWAPI`
+      },
+      async (uri, { id }) => {
+        console.log(`API Call to SWAPI ${resourceType} ${id}`);
+        try {
+          const response = await fetch(`https://swapi.info/api/${resourceType}/${id}`);
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+
+          // Return the raw data as JSON for programmatic access
+          // and a formatted text version for human readability
+          return {
+            contents: [
+              {
+                uri: uri.href,
+                mimeType: "application/json",
+                text: JSON.stringify(data, null, 2)
+              },
+              {
+                uri: uri.href,
+                mimeType: "text/plain",
+                text: formatStarWarsData(data, resourceType)
+              }
+            ]
+          };
+        } catch (error) {
+          console.log({ error });
+          throw new Error(`Failed to fetch ${resourceType} ${id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+    );
+  });
+
+  // Helper function to format the data nicely
+  function formatStarWarsData(data: any, resourceType: string): string {
+    let formatted = `${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)} Information:\n\n`;
+    formatted += `Name: ${data.name || data.title}\n`;
+
+    // Add relevant fields based on resource type
+    const fieldMappings: { [key: string]: string[] } = {
+      films: ['episode_id', 'director', 'producer', 'release_date', 'opening_crawl'],
+      people: ['birth_year', 'height', 'mass', 'hair_color', 'eye_color', 'gender'],
+      planets: ['diameter', 'climate', 'terrain', 'population'],
+      species: ['classification', 'designation', 'average_height', 'language'],
+      starships: ['model', 'manufacturer', 'cost_in_credits', 'length', 'crew', 'passengers'],
+      vehicles: ['model', 'manufacturer', 'cost_in_credits', 'length', 'crew', 'passengers']
+    };
+
+    const fields = fieldMappings[resourceType] || [];
+    fields.forEach(field => {
+      if (data[field]) {
+        const label = field.split('_').map(word =>
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+        formatted += `${label}: ${data[field]}\n`;
+      }
+    });
+
+    if (data.opening_crawl) {
+      formatted += `\nOpening Crawl:\n${data.opening_crawl}\n`;
+    }
+
+    return formatted;
+  }
 
   return server;
 }
@@ -263,7 +305,6 @@ app.post('/mcp', async (req: Request, res: Response) => {
   }
 });
 
-
 // Reconnect requests for existing sessions
 app.get('/mcp', async (req: Request, res: Response) => {
   console.log("GET Request received at /mcp");
@@ -292,6 +333,31 @@ app.delete('/mcp', async (req: Request, res: Response) => {
   await transport.handleRequest(req, res);
 });
 
+const sseTransports: { [sessionId: string]: SSEServerTransport } = {};
+// Legacy SSE endpoint for older clients
+app.get('/sse', async (req, res) => {
+  // Create SSE transport for legacy clients
+  const transport = new SSEServerTransport('/messages', res);
+  sseTransports[transport.sessionId] = transport;
+
+  res.on("close", () => {
+    delete sseTransports[transport.sessionId];
+  });
+
+  const server = createMcpServer();
+  await server.connect(transport);
+});
+
+// Legacy message endpoint for older clients
+app.post('/messages', async (req, res) => {
+  const sessionId = req.query.sessionId as string;
+  const transport = sseTransports[sessionId];
+  if (transport) {
+    await transport.handlePostMessage(req, res, req.body);
+  } else {
+    res.status(400).send('No transport found for sessionId');
+  }
+});
 
 app.get('/', (req: Request, res: Response) => {
   console.log("GET Request received at /");
