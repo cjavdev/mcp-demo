@@ -8,21 +8,11 @@
   },
   "scripts": {
     "dev": "bun --watch src/server.ts",
+    "build": "bun build src/server.ts --outfile dist/server.js",
     "start": "bun src/server.ts",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
-    "type-check": "bun --check src/server.ts",
-    "clean": "rm -rf dist",
-    "build": "bun build src/server.ts --outfile dist/server.js"
+    "clean": "rm -rf dist"
   },
-  "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "llm",
-    "ai",
-    "context",
-    "server"
-  ],
+  "keywords": [],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",
     "cors": "^2.8.5",
@@ -41,16 +31,5 @@
     "eslint": "^8.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "author": "CJ Avilla",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/cjavdev/mcp-demo.git"
   }
 }
