@@ -1,205 +1,92 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { randomUUID } from "crypto";
+import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { z } from "zod";
 
 const app = express();
 app.use(express.json());
 
-// Environment configuration
-const env = {
-  ALLOWED_DOMAINS: process.env.NODE_ENV === 'production'
-    ? (process.env.ALLOWED_DOMAINS?.split(',').map(d => d.trim()) || [])
-    : ['localhost:3000', '127.0.0.1:3000']
-};
-
-// Configure CORS for browser clients (latest requirements)
-const getAllowedOrigins = () => {
-  if (process.env.NODE_ENV !== 'production') return '*';
-
-  const origins: string[] = [];
-  env.ALLOWED_DOMAINS.forEach(domain => {
-    origins.push(`https://${domain}`, `http://${domain}`);
-  });
-  return origins;
-};
+// --- Security: CORS + optional token auth
+const allowedOrigins = (process.env.ALLOWED_DOMAINS ?? "")
+  .split(",")
+  .map(d => d.trim())
+  .filter(Boolean)
+  .flatMap(d => [`https://${d}`, `http://${d}`]);
 
 app.use(cors({
-  origin: getAllowedOrigins(),
-  exposedHeaders: ['Mcp-Session-Id'], // Required for browser clients
-  allowedHeaders: ['Content-Type', 'mcp-session-id'],
-  methods: ['GET', 'POST', 'DELETE']
+  origin: process.env.NODE_ENV === "production" ? allowedOrigins : true,
+  exposedHeaders: ["Mcp-Session-Id"],
+  allowedHeaders: ["Content-Type", "mcp-session-id", "authorization"],
+  methods: ["GET", "POST", "DELETE"]
 }));
 
-function createMcpServer(): McpServer {
-  const server = new McpServer(
-    {
-      name: "math-mcp-server",
-      version: "1.0.0"
-    }
-  );
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV !== "production") return next();
+  if (req.get("Authorization") === `Bearer ${process.env.SERVER_TOKEN}`) return next();
+  res.status(401).send("Unauthorized");
+});
 
-  server.registerTool("add",
+// --- MCP session management
+const transports: Record<string, StreamableHTTPServerTransport> = {};
+
+function createMcpServer(): McpServer {
+  const server = new McpServer({ name: "math-mcp-server", version: "1.0.0" });
+  server.registerTool(
+    "add",
     {
-      title: "Addition Tool",
-      description: "Add two numbers",
+      title: "Add two numbers",
+      description: "Returns a + b",
       inputSchema: { a: z.number(), b: z.number() }
     },
-    async ({ a, b }) => ({
-      content: [{ type: "text", text: String(a + b) }]
-    })
+    async ({ a, b }) => ({ content: [{ type: "text", text: String(a + b) }] })
   );
-
   return server;
 }
 
-// Session management for stateful connections
-const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
-
-// Initialze and start session connect requests
-app.post('/mcp', async (req: Request, res: Response) => {
-  const sessionId = req.headers['mcp-session-id'] as string | undefined;
-  let transport: StreamableHTTPServerTransport;
+// --- POST /mcp: initialize or send message
+app.post("/mcp", async (req: Request, res: Response) => {
+  const sid = req.headers["mcp-session-id"] as string | undefined;
+  let transport = sid ? transports[sid] : undefined;
 
   try {
-    if (sessionId && transports[sessionId]) {
-      // Reuse existing transport
-      transport = transports[sessionId];
-    } else if (!sessionId && isInitializeRequest(req.body)) {
-      // New initialization request
+    if (!transport) {
+      if (!isInitializeRequest(req.body)) {
+        return res.status(400).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Expected initialize" } });
+      }
       transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
+        sessionIdGenerator: randomUUID,
         onsessioninitialized: (sessionId) => {
-          transports[sessionId] = transport;
+          transports[sessionId] = transport!;
         },
-        enableDnsRebindingProtection: process.env.NODE_ENV === 'production',
-        allowedHosts: env.ALLOWED_DOMAINS
+        enableDnsRebindingProtection: process.env.NODE_ENV === "production",
+        allowedHosts: allowedOrigins.map(u => new URL(u).host)
       });
-
-      // Clean up transport when closed
-      transport.onclose = () => {
-        if (transport.sessionId) {
-          delete transports[transport.sessionId];
-        }
-      };
-
-      const server = createMcpServer();
-      await server.connect(transport);
-    } else {
-      res.status(400).json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message: 'Bad Request: No valid session ID provided',
-        },
-        id: null,
-      });
-      return;
+      transport.onclose = () => { if (transport?.sessionId) delete transports[transport.sessionId]; };
+      await createMcpServer().connect(transport);
     }
-
     await transport.handleRequest(req, res, req.body);
-  } catch (error) {
-    if (!res.headersSent) {
-      res.status(500).json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32603,
-          message: 'Internal server error',
-        },
-        id: null,
-      });
-    }
+  } catch {
+    if (!res.headersSent) res.status(500).json({ jsonrpc: "2.0", id: null, error: { code: -32603, message: "Internal server error" } });
   }
 });
 
-// Reconnect requests for existing sessions
-app.get('/mcp', async (req: Request, res: Response) => {
-  const sessionId = req.headers['mcp-session-id'] as string | undefined;
-
-  if (!sessionId || !transports[sessionId]) {
-    res.status(400).send('Invalid or missing session ID');
-    return;
+// --- GET /mcp: refresh an open stream
+app.get("/mcp", async (req, res) => {
+  const sid = req.headers["mcp-session-id"] as string | undefined;
+  const transport = sid ? transports[sid] : undefined;
+  if (!transport) {
+    return res.status(400).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Unknown session" } });
   }
-
-  const transport = transports[sessionId];
   await transport.handleRequest(req, res);
 });
 
-// Disconnect requests for existing sessions
-app.delete('/mcp', async (req: Request, res: Response) => {
-  const sessionId = req.headers['mcp-session-id'] as string | undefined;
-
-  if (!sessionId || !transports[sessionId]) {
-    res.status(400).send('Invalid or missing session ID');
-    return;
-  }
-
-  const transport = transports[sessionId];
-  await transport.handleRequest(req, res);
+// --- Health check
+app.get("/health", (_req, res) => {
+  res.json({ status: "healthy", activeSessions: Object.keys(transports).length });
 });
 
-
-// Bakcwards compatability for legacy SSE endpoint
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-const sseTransports: { [sessionId: string]: SSEServerTransport } = {};
-
-app.get('/sse', async (req, res) => {
-  // Create SSE transport for legacy clients
-  const transport = new SSEServerTransport('/messages', res);
-  sseTransports[transport.sessionId] = transport;
-
-  res.on("close", () => {
-    delete sseTransports[transport.sessionId];
-  });
-
-  const server = createMcpServer();
-  await server.connect(transport);
-});
-
-// Legacy message endpoint for older clients
-app.post('/messages', async (req, res) => {
-  const sessionId = req.query.sessionId as string;
-  const transport = sseTransports[sessionId];
-  if (transport) {
-    await transport.handlePostMessage(req, res, req.body);
-  } else {
-    res.status(400).send('No transport found for sessionId');
-  }
-});
-
-app.get('/', (req: Request, res: Response) => {
-  res.send('This is a demo MCP server. Use `/mcp` for Streamable HTTP.');
-});
-
-// Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    activeSessions: Object.keys(transports).length,
-    version: '1.0.0'
-  });
-});
-
-// Start server
-const PORT = parseInt(process.env.PORT || '3000', 10);
-app.listen(PORT, () => {
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔗 Streamable HTTP MCP endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`🔗 MCP endpoint: http://localhost:${PORT}/sse`);
-  console.log(`🛡️ DNS protection: ${process.env.NODE_ENV === 'production' ? 'enabled' : 'disabled'}`);
-  console.log(`🔒 Allowed domains: ${process.env.ALLOWED_DOMAINS?.split(',').map(d => d.trim()).join(', ')}`);
-});
-
-const gracefulShutdown = async () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  // Close all active transports
-  await Promise.all(Object.values(transports).map(transport => transport.close()));
-  process.exit(0);
-};
-
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+const PORT = Number(process.env.PORT ?? 3000);
+app.listen(PORT, () => console.log(`🔗 SHTTP MCP endpoint: http://localhost:${PORT}/mcp`));

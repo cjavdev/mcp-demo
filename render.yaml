@@ -6,11 +6,13 @@ services:
     region: oregon
     buildCommand: bun install
     startCommand: bun run start
-    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
       - key: ALLOWED_DOMAINS
         value: mcp.demo.cjav.dev
+      - key: SERVER_TOKEN
+        generateValue: true
     domains:
       - mcp.demo.cjav.dev
+    healthCheckPath: /health
