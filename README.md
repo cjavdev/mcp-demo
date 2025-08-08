@@ -1,355 +1,163 @@
-# Star Wars MCP Server
+# MCP Demo Server
 
-A Model Context Protocol (MCP) server that provides access to Star Wars information from the Star Wars API (SWAPI). This server can be deployed to Render and used by MCP-compatible AI assistants and clients.
+A demonstration [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server built with TypeScript and Bun. This server provides a simple math tool that can add two numbers together, showcasing how to implement MCP tools and handle HTTP-based MCP communication.
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/your-username/mcp-demo)
 
 ## Features
 
-- **Star Wars Information**: Access comprehensive data about films, characters, planets, starships, vehicles, and species
-- **HTTP Transport**: Supports web-based MCP clients through HTTP transport
-- **CORS Support**: Configured for browser-based clients
+- **MCP Tool Implementation**: Simple addition tool demonstrating MCP tool registration
+- **HTTP Transport**: Uses streamable HTTP transport for MCP communication
+- **Session Management**: Handles multiple concurrent MCP sessions
+- **Security**: CORS protection and optional token authentication
 - **Health Monitoring**: Built-in health check endpoint
-- **Production Ready**: Optimized for deployment on Render
+- **Production Ready**: Configured for deployment with proper environment variables
 
-## Local Development
+## Quick Start
 
 ### Prerequisites
 
 - [Bun](https://bun.sh/) >= 1.0.0
+- Node.js (for development)
 
-### Setup
+### Local Development
 
-1. Clone the repository:
+1. **Clone the repository**
 
-```bash
-git clone https://github.com/cjavdev/mcp-demo.git
-cd mcp-demo
-```
+   ```bash
+   git clone <repository-url>
+   cd mcp-demo
+   ```
 
-2. Install dependencies:
+2. **Install dependencies**
 
-```bash
-bun install
-```
+   ```bash
+   bun install
+   ```
 
-3. Review and customize environment variables:
+3. **Start the development server**
 
-The repository includes:
+   ```bash
+   bun run dev
+   ```
 
-- **`.env.example`** - Template showing all available environment variables
-- **`.env`** - Pre-configured for local development
+4. **Test the server**
+   ```bash
+   curl http://localhost:3000/health
+   ```
 
-You can customize `.env` for your specific needs if required.
+The server will be running at `http://localhost:3000` with the MCP endpoint at `/mcp`.
 
-4. Start the development server:
+## API Endpoints
 
-```bash
-bun dev
-```
+### MCP Endpoint
 
-The server will start on `http://localhost:3000` with the following endpoints:
+- **POST/GET `/mcp`** - Main MCP communication endpoint
+  - Handles MCP protocol messages
+  - Manages session initialization and tool calls
+  - Requires `mcp-session-id` header for existing sessions
 
-- **MCP Endpoint**: `http://localhost:3000/mcp`
-- **Health Check**: `http://localhost:3000/health`
+### Health Check
 
-### Testing with MCP Inspector
-
-To verify your local MCP server is working correctly, you can use the official MCP Inspector tool:
-
-1. **Start your local server** (if not already running):
-
-```bash
-bun dev
-```
-
-2. **Run the MCP Inspector** in a new terminal:
-
-```bash
-npx @modelcontextprotocol/inspector http://localhost:3000/mcp
-```
-
-3. **Test the server capabilities**:
-
-   - The inspector will open in your default browser
-   - You'll see the server's available tools, resources, and prompts
-   - Test the `star-wars-info` tool with different parameters:
-     - Resource: `films`, `people`, `planets`, etc.
-     - Try with and without ID or search parameters
-   - Verify all functionality works as expected
-
-4. **Expected functionality**:
-   - ✅ Server should initialize and show capabilities
-   - ✅ Star Wars tool should return formatted data
-   - ✅ Error handling should work gracefully
-   - ✅ Session management should be stable
-
-**Troubleshooting**:
-
-- If the inspector can't connect, verify the server is running on port 3000
-- Check the server logs for any error messages
-- Ensure no firewall is blocking the connection
-
-## Environment Variables
-
-The MCP server supports the following environment variables:
-
-### `ALLOWED_DOMAINS`
-
-- **Description**: Comma-separated list of domains for CORS and DNS rebinding protection
-- **Default**: `mcp.demo.cjav.dev`
-- **Usage**: Set this to your custom domains when deploying to production
-- **Example**: `ALLOWED_DOMAINS=your-custom-domain.com,another-domain.com`
-
-### `NODE_ENV`
-
-- **Description**: Application environment
-- **Values**: `development` or `production`
-- **Default**: `development`
-- **Usage**: Set to `production` for production deployments
-
-### `PORT`
-
-- **Description**: Server port
-- **Default**: `3000`
-- **Usage**: Automatically set by Render, but can be overridden for local development
-
-### Setting Environment Variables
-
-#### Local Development
-
-The project uses `.env` files for local environment configuration. The repository includes:
-
-- **`.env`** - Ready-to-use local development configuration
-- **`.env.example`** - Template showing all available options
-
-To customize your local environment, simply edit the `.env` file:
-
-```bash
-# Environment Configuration
-NODE_ENV=development
-PORT=3000
-ALLOWED_DOMAINS=localhost:3000,127.0.0.1:3000
-LOG_LEVEL=info
-```
-
-#### Render Dashboard
-
-1. Go to your service in the Render dashboard
-2. Navigate to "Environment" tab
-3. Add environment variables:
-   - `NODE_ENV`: `production`
-   - `ALLOWED_DOMAINS`: `your-custom-domain.com,api.your-domain.com`
-
-#### Render YAML
-
-Add to your `render.yaml`:
-
-```yaml
-envVars:
-  - key: NODE_ENV
-    value: production
-  - key: ALLOWED_DOMAINS
-    value: your-custom-domain.com,api.your-domain.com
-```
-
-## Deploying to Render
-
-### Using the Render Dashboard
-
-1. **Fork/Clone the Repository**: Ensure you have this code in a Git repository that Render can access.
-
-2. **Create a New Web Service**:
-
-   - Go to [Render Dashboard](https://dashboard.render.com)
-   - Click "New +" → "Web Service"
-   - Connect your GitHub/GitLab repository
-   - Select this repository
-
-3. **Configure the Service**:
-
-   - **Name**: `mcp-demo` (or your preferred name)
-   - **Runtime**: `Node`
-   - **Build Command**: `bun install`
-   - **Start Command**: `bun start`
-   - **Plan**: `Starter` (or higher based on your needs)
-
-4. **Set Environment Variables**:
-
-   - `NODE_ENV`: `production`
-   - `ALLOWED_DOMAINS`: Comma-separated list of your custom domains (optional, defaults to `mcp.demo.cjav.dev`)
-
-5. **Deploy**: Click "Create Web Service"
-
-### Using the Render YAML (Recommended)
-
-This repository includes a `render.yaml` file for infrastructure-as-code deployment:
-
-1. **Connect Repository to Render**:
-
-   - Go to [Render Dashboard](https://dashboard.render.com)
-   - Click "New +" → "Blueprint"
-   - Connect your repository
-   - Render will automatically detect the `render.yaml` file
-
-2. **Review Configuration**: The YAML defines:
-
-   - Web service with Starter plan
-   - Bun build and start commands
-   - Production environment variables (`NODE_ENV`, `ALLOWED_DOMAINS`)
-   - Optional custom domain configuration
-
-3. **Deploy**: Click "Apply" to deploy
-
-### Using Render CLI
-
-If you have the [Render CLI](https://render.com/docs/cli) installed:
-
-```bash
-# Deploy using the render.yaml
-render services create
-```
-
-## Configuring MCP Clients
-
-Once deployed to Render, your MCP server will be accessible via HTTP. Here's how to configure various MCP clients:
-
-### Getting Your Server URL
-
-After deployment, your server will be available at:
-
-- **Render URL**: `https://your-service-name.onrender.com`
-- **Custom Domain** (if configured): `https://mcp.demo.cjav.dev`
-
-The MCP endpoint will be: `https://your-service-name.onrender.com/mcp`
-
-### Claude Desktop Configuration
-
-Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
-
-```json
-{
-  "mcpServers": {
-    "starwars": {
-      "command": "npx",
-      "args": [
-        "@modelcontextprotocol/server-fetch",
-        "https://your-service-name.onrender.com/mcp"
-      ]
-    }
-  }
-}
-```
-
-### Cline (VS Code Extension) Configuration
-
-In your Cline settings, add the MCP server:
-
-```json
-{
-  "mcp.servers": [
-    {
-      "name": "starwars",
-      "transport": {
-        "type": "http",
-        "baseUrl": "https://your-service-name.onrender.com/mcp"
-      }
-    }
-  ]
-}
-```
-
-### Generic HTTP MCP Client
-
-For any MCP client that supports HTTP transport:
-
-```json
-{
-  "transport": {
-    "type": "http",
-    "baseUrl": "https://your-service-name.onrender.com/mcp"
-  }
-}
-```
-
-### Browser-based Clients
-
-This server supports CORS for browser-based clients. Simply connect to:
-
-```
-https://your-service-name.onrender.com/mcp
-```
+- **GET `/health`** - Server health status
+  - Returns server status and active session count
+  - Used for monitoring and load balancer health checks
 
 ## Available Tools
 
-The server provides one main tool:
+### Add Tool
 
-### `star-wars-info`
-
-Get information about Star Wars films, characters, planets, starships, vehicles, and species.
+Adds two numbers together.
 
 **Parameters:**
 
-- `resource` (required): Type of resource - "films", "people", "planets", "species", "starships", or "vehicles"
-- `id` (optional): Specific ID to fetch (if omitted, returns all items)
-- `search` (optional): Search term to filter results
+- `a` (number): First number
+- `b` (number): Second number
 
-**Examples:**
+**Returns:** The sum of `a + b`
 
-- Get all films: `{"resource": "films"}`
-- Get specific character: `{"resource": "people", "id": "1"}`
-- Search for planets: `{"resource": "planets", "search": "Tatooine"}`
+## Environment Variables
 
-## Monitoring and Health Checks
+| Variable          | Description                                      | Default       | Required   |
+| ----------------- | ------------------------------------------------ | ------------- | ---------- |
+| `PORT`            | Server port                                      | `3000`        | No         |
+| `NODE_ENV`        | Environment mode                                 | `development` | No         |
+| `ALLOWED_DOMAINS` | Comma-separated list of allowed domains for CORS | -             | Production |
+| `SERVER_TOKEN`    | Bearer token for authentication                  | -             | Production |
 
-### Health Check Endpoint
+## Deployment
 
-The server provides a health check at `/health`:
+### Deploy to Render
 
-```bash
-curl https://your-service-name.onrender.com/health
+Click the deploy button above or manually deploy:
+
+1. Fork this repository
+2. Connect your Render account to GitHub
+3. Create a new Web Service
+4. Set the following:
+   - **Build Command**: `bun install`
+   - **Start Command**: `bun run start`
+   - **Environment Variables**: Set `NODE_ENV=production` and other required vars
+
+### Manual Deployment
+
+1. **Build the project**
+
+   ```bash
+   bun run build
+   ```
+
+2. **Set environment variables**
+
+   ```bash
+   export NODE_ENV=production
+   export ALLOWED_DOMAINS=your-domain.com
+   export SERVER_TOKEN=your-secure-token
+   ```
+
+3. **Start the server**
+   ```bash
+   bun run start
+   ```
+
+## Development
+
+### Scripts
+
+- `bun run dev` - Start development server with file watching
+- `bun run build` - Build the project
+- `bun run start` - Start production server
+- `bun run clean` - Remove build artifacts
+
+### Project Structure
+
+```
+mcp-demo/
+├── src/
+│   └── server.ts          # Main server implementation
+├── package.json           # Dependencies and scripts
+├── tsconfig.json         # TypeScript configuration
+├── render.yaml           # Render deployment configuration
+└── README.md             # This file
 ```
 
-Response:
+## MCP Protocol
 
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-01-15T10:30:00.000Z",
-  "activeSessions": 0,
-  "version": "1.0.0"
-}
-```
+This server implements the Model Context Protocol, which allows AI assistants to connect to external tools and data sources. The server:
 
-### Logs
+1. **Registers Tools**: Defines available tools with schemas
+2. **Handles Sessions**: Manages multiple concurrent client connections
+3. **Processes Requests**: Executes tool calls and returns results
+4. **Maintains State**: Keeps session state for ongoing conversations
 
-Monitor your deployment through the Render dashboard:
+For more information about MCP, visit [modelcontextprotocol.io](https://modelcontextprotocol.io/).
 
-1. Go to your service in the Render dashboard
-2. Click on "Logs" to view real-time application logs
-3. Monitor for any connection issues or errors
+## Security
 
-## Troubleshooting
-
-### Common Issues
-
-1. **CORS Errors**: Ensure your client origin is included in the CORS configuration if you're using a browser-based client.
-
-2. **Connection Timeouts**: Render's free tier may experience cold starts. Consider upgrading to a paid plan for better performance.
-
-3. **Environment Variables**: Make sure `NODE_ENV=production` is set in your Render service configuration.
-
-### Debug Mode
-
-For local debugging, you can enable verbose logging by modifying the server or adding debug environment variables.
-
-## Development Scripts
-
-- `bun dev` - Start HTTP MCP server with hot reload
-- `bun start` - Start HTTP MCP server (production)
-- `bun lint` - Run ESLint
-- `bun lint:fix` - Fix ESLint errors automatically
-- `bun type-check` - Run TypeScript type checking
-- `bun build` - Build HTTP server for production
-- `bun clean` - Clean build artifacts
+- **CORS Protection**: Configurable allowed origins
+- **Token Authentication**: Optional bearer token auth for production
+- **DNS Rebinding Protection**: Enabled in production mode
+- **Input Validation**: Zod schema validation for tool parameters
 
 ## Contributing
 
@@ -362,3 +170,11 @@ For local debugging, you can enable verbose logging by modifying the server or a
 ## License
 
 MIT License - see LICENSE file for details.
+
+## Support
+
+For questions or issues:
+
+- Check the [MCP Documentation](https://modelcontextprotocol.io/docs)
+- Open an issue in this repository
+- Review the server logs for debugging information
