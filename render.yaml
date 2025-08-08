@@ -1,10 +1,11 @@
 services:
   - type: web
     name: mcp-demo
+    runtime: bun
     plan: starter
     region: oregon
     buildCommand: bun install
-    startCommand: bun start
+    startCommand: bun run start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV

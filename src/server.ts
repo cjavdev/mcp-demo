@@ -34,9 +34,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'DELETE']
 }));
 
-// Session management for stateful connections
-const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
-
 function createMcpServer(): McpServer {
   const server = new McpServer(
     {
@@ -56,19 +53,11 @@ function createMcpServer(): McpServer {
     })
   );
 
-  server.registerTool("multiply",
-    {
-      title: "Multiplication Tool",
-      description: "Multiply two numbers",
-      inputSchema: { a: z.number(), b: z.number() }
-    },
-    async ({ a, b }) => ({
-      content: [{ type: "text", text: String(a * b) }]
-    })
-  );
-
   return server;
 }
+
+// Session management for stateful connections
+const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
 // Initialze and start session connect requests
 app.post('/mcp', async (req: Request, res: Response) => {
